@@ -1,6 +1,6 @@
 import random
 import streamlit as st
-
+# FIXME: Logic breaks here
 def get_range_for_difficulty(difficulty: str):
     if difficulty == "Easy":
         return 1, 20
@@ -28,7 +28,7 @@ def parse_guess(raw: str):
 
     return True, value, None
 
-
+# FIXME: Logic breaks here
 def check_guess(guess, secret):
     if guess == secret:
         return "Win", "🎉 Correct!"
@@ -91,7 +91,7 @@ st.sidebar.caption(f"Attempts allowed: {attempt_limit}")
 
 if "secret" not in st.session_state:
     st.session_state.secret = random.randint(low, high)
-
+# FIXME: Logic breaks here
 if "attempts" not in st.session_state:
     st.session_state.attempts = 1
 
@@ -110,7 +110,7 @@ st.info(
     f"Guess a number between 1 and 100. "
     f"Attempts left: {attempt_limit - st.session_state.attempts}"
 )
-
+# FIXME: Logic breaks here
 with st.expander("Developer Debug Info"):
     st.write("Secret:", st.session_state.secret)
     st.write("Attempts:", st.session_state.attempts)
@@ -130,7 +130,7 @@ with col2:
     new_game = st.button("New Game 🔁")
 with col3:
     show_hint = st.checkbox("Show hint", value=True)
-
+# FIXME: Logic breaks here
 if new_game:
     st.session_state.attempts = 0
     st.session_state.secret = random.randint(1, 100)
