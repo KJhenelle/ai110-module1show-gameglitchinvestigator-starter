@@ -7,6 +7,11 @@ Answer each question in 3 to 5 sentences. Be specific and honest about what actu
 - What did the game look like the first time you ran it?
 - List at least two concrete bugs you noticed at the start  
   (for example: "the hints were backwards").
+  
+  - the hints were backward
+  - High difficulty easier than normal difficulty
+  - New game button does not start new game
+  - you get 1 less guess than you're meant to 
 
 **Bug Reproduction Log**
 
@@ -14,10 +19,10 @@ Document at least 3 bugs you found. Add rows as needed.
 
 | Input | Expected Behavior | Actual Behavior | Console Output / Error |
 |-------|-------------------|-----------------|------------------------|
-| | | | |
-| | | | |
-| | | | |
-
+| number higher than target| hint says go lower| hint says go higher|None|
+| Harder difficulty| Expanded range of numbers| reduced range of numbers| None|
+| New game | start new game and allow more inputs| remains in game over mode | None |
+|input guess|add to history|adds to history after next guess|None|
 ---
 
 ## 2. How did you use AI as a teammate?
