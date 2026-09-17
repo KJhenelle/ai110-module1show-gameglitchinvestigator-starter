@@ -1,3 +1,4 @@
+# FIX: Refactored logic out of app.py into logic_utils.py using agent mode.
 def get_range_for_difficulty(difficulty: str):
     """Return (low, high) inclusive range for a given difficulty."""
     if difficulty == "Easy":
@@ -44,6 +45,8 @@ def check_guess(guess, secret):
     if guess_val == secret_val:
         return "Win", "🎉 Correct!"
 
+    # FIX: high/low hint messages were swapped; agent mode corrected them
+    # so "Too High" tells the player to go LOWER and vice versa.
     if guess_val > secret_val:
         return "Too High", "📉 Go LOWER!"
 

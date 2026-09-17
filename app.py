@@ -1,6 +1,8 @@
 import random
 import streamlit as st
 
+# FIX: Removed duplicate logic definitions from app.py; now imported from
+# logic_utils.py using agent mode.
 from logic_utils import (
     check_guess,
     get_range_for_difficulty,
@@ -35,7 +37,8 @@ st.sidebar.caption(f"Attempts allowed: {attempt_limit}")
 
 if "secret" not in st.session_state:
     st.session_state.secret = random.randint(low, high)
-# FIXME: Logic breaks here
+# FIX: attempts started at 1 instead of 0, silently costing the player
+# their first guess. Found and corrected in agent mode.
 if "attempts" not in st.session_state:
     st.session_state.attempts = 0
 
@@ -67,7 +70,10 @@ with col2:
     new_game = st.button("New Game 🔁")
 with col3:
     show_hint = st.checkbox("Show hint", value=True)
-# FIXME: Logic breaks here
+# FIX: "New Game" reset attempts/secret but left status as "won"/"lost",
+# so the game-over check below would immediately st.stop() the app and
+# no new guesses could be submitted. Diagnosed and fixed together in
+# agent mode by also resetting status (and history) here.
 if new_game:
     st.session_state.attempts = 0
     st.session_state.secret = random.randint(1, 100)
@@ -94,6 +100,10 @@ if submit:
     else:
         st.session_state.history.append(guess_int)
 
+        # FIX: removed a block that stringified `secret` on even-numbered
+        # attempts, which forced check_guess into a broken str-comparison
+        # fallback with inverted high/low hints. Diagnosed together and
+        # fixed in agent mode by casting to int inside check_guess instead.
         outcome, message = check_guess(guess_int, st.session_state.secret)
 
         if show_hint:
@@ -121,6 +131,9 @@ if submit:
                     f"Score: {st.session_state.score}"
                 )
 
+# FIX: this expander used to be rendered before the guess-processing
+# code, so it always showed stale (one-run-old) attempts/history. Moved
+# below the submit block in agent mode so it reflects the current run.
 with st.expander("Developer Debug Info"):
     st.write("Secret:", st.session_state.secret)
     st.write("Attempts:", st.session_state.attempts)
