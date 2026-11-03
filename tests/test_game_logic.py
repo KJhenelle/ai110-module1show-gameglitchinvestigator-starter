@@ -1,6 +1,16 @@
 from streamlit.testing.v1 import AppTest
 
-from logic_utils import check_guess
+from logic_utils import (
+    attack_power,
+    check_guess,
+    enemy_damage,
+    spell_damage,
+    spell_lands,
+    add_xp,
+    max_hp_for_level,
+    spell_multiplier,
+)
+from world import MAPS, try_move
 
 # FIX: check_guess returns an (outcome, message) tuple; agent mode updated
 # these tests to unpack it instead of comparing the tuple to a bare string.
@@ -35,67 +45,143 @@ def test_too_low_message_says_go_higher():
     assert "HIGHER" in message
     assert "LOWER" not in message
 
-# FIX: written in agent mode alongside the app.py fix where "New Game"
-# wasn't resetting status back to "playing", which left the app stuck
-# on the game-over screen and unable to accept new guesses.
-def test_new_game_allows_guessing_after_a_win():
-    # Regression test for the glitch: after winning, clicking "New Game"
-    # must let the player submit guesses again instead of leaving the
-    # app stuck on "Game over" / "You already won".
-    at = AppTest.from_file("../app.py")
+def test_attack_power_rises_as_guess_gets_closer():
+    assert attack_power(50, 50) > attack_power(52, 50) > attack_power(80, 50)
+    assert attack_power(1, 100) >= 0
+
+
+def test_spell_lands_within_10_on_first_two_guesses():
+    assert spell_lands(58, 50, 1)
+    assert spell_lands(40, 50, 2)
+    assert not spell_lands(61, 50, 1)
+
+
+def test_close_guess_misses_after_second_guess_but_exact_still_lands():
+    assert not spell_lands(55, 50, 3)
+    assert spell_lands(50, 50, 7)
+
+
+def test_exact_hit_is_a_critical_strike():
+    assert spell_damage(50, 50) > spell_damage(51, 50)
+
+
+def test_enemy_damage_stays_near_base():
+    import random
+    for _ in range(50):
+        assert 9 <= enemy_damage(random, 12) <= 15
+
+
+def test_add_xp_levels_up_and_carries_over():
+    assert add_xp(1, 0, 30) == (1, 30, 0)
+    assert add_xp(1, 30, 50) == (2, 40, 1)  # 80 total: 40 to level 2, 40 left
+    assert max_hp_for_level(3) > max_hp_for_level(1)
+    assert spell_multiplier(3) > spell_multiplier(1)
+
+
+def test_walls_and_water_block_movement():
+    assert try_move(0, (1, 1), 0, -1, 1, set())["kind"] == "blocked"  # tree border
+    assert try_move(0, (7, 1), 1, 0, 1, set())["kind"] == "blocked"   # water
+
+
+def test_walking_onto_open_ground_moves_the_witch():
+    r = try_move(0, (1, 1), 1, 0, 1, set())
+    assert r == {"kind": "move", "pos": (2, 1), "heal": False}
+
+
+def test_stepping_into_a_monster_starts_a_battle_unless_defeated():
+    assert try_move(0, (6, 2), 0, 1, 1, set())["kind"] == "battle"
+    assert try_move(0, (6, 2), 0, 1, 1, {(0, 6, 3)})["kind"] == "move"
+
+
+def test_gate_is_locked_until_the_required_level():
+    assert try_move(0, (6, 7), 0, 1, 2, set())["kind"] == "locked"
+    r = try_move(0, (6, 7), 0, 1, 3, set())
+    assert r["kind"] == "exit" and r["area"] == 1
+
+
+def test_sealed_door_is_not_implemented_yet():
+    r = try_move(1, (6, 7), 0, 1, 99, set())
+    assert r["kind"] == "locked"
+
+
+def test_inn_heals():
+    assert try_move(0, (4, 5), 0, -1, 1, set())["heal"] is True
+
+
+def test_every_map_row_is_the_same_width_and_exits_are_gates():
+    for area, m in enumerate(MAPS):
+        assert len({len(r) for r in m["rows"]}) == 1
+        for (x, y) in m["exits"]:
+            assert m["rows"][y][x] in "GBL"
+
+
+def _battle(at, **state):
+    at.run()
+    at.session_state["mode"] = "battle"
+    at.session_state["enemy"] = {
+        "name": "Bog Slime", "art": "slime", "hp": 150, "atk": 10, "xp": 40,
+        "at": (6, 3), "area": 0,
+    }
+    at.session_state["enemy_hp"] = 150
+    at.session_state["secret"] = 50
+    for k, v in state.items():
+        at.session_state[k] = v
     at.run()
 
-    # Force the current round into a "won" state without playing it out.
-    at.session_state["status"] = "won"
 
-    # Click "New Game".
-    new_game_button = next(
-        b for b in at.button if "New Game" in b.label
-    )
-    new_game_button.click().run()
+def _cast(at, guess):
+    at.text_input[0].set_value(str(guess))
+    next(b for b in at.button if "Cast" in b.label).click().run()
 
-    assert at.session_state["status"] == "playing"
 
-    # Submitting a guess should now be processed instead of the app
-    # stopping early on the stale "won"/"lost" status.
-    guess_inputs = [w for w in at.text_input]
-    assert guess_inputs, "Expected a guess text input to be rendered"
-    guess_inputs[0].set_value("1").run()
+def test_landed_spell_damages_enemy_and_switches_number():
+    at = AppTest.from_file("../app.py", default_timeout=120)
+    _battle(at)
+    _cast(at, 55)
+    assert at.session_state["enemy_hp"] < 150
+    assert at.session_state["last_event"]["kind"] == "player"
+    assert at.session_state["attempts"] == 0  # number switched
 
-    submit_button = next(
-        b for b in at.button if "Submit Guess" in b.label
-    )
-    submit_button.click().run()
 
-    assert at.session_state["attempts"] == 1
+def test_missed_spell_hurts_the_witch():
+    at = AppTest.from_file("../app.py", default_timeout=120)
+    _battle(at)
+    _cast(at, 99)
+    assert at.session_state["player_hp"] < 100
+    assert at.session_state["last_event"]["kind"] == "enemy"
+    assert at.session_state["secret"] == 50  # number stays until guessed
 
-# FIX: written in agent mode alongside the app.py fix that moved the
-# "Developer Debug Info" expander below the submit-processing block.
-def test_debug_info_reflects_guess_in_the_same_run():
-    # Regression test for the glitch: the "Developer Debug Info" expander
-    # used to be rendered ABOVE the guess-processing code, so a submitted
-    # guess wasn't reflected in the debug attempts/history until the next
-    # rerun. It must now show the up-to-date state on the very same run
-    # the guess was submitted in.
-    at = AppTest.from_file("../app.py")
+
+def test_defeating_a_monster_gives_xp_and_returns_to_the_map():
+    at = AppTest.from_file("../app.py", default_timeout=120)
+    _battle(at, enemy_hp=1)
+    _cast(at, 50)
+    assert at.session_state["mode"] == "explore"
+    assert at.session_state["level"] == 2  # 40 XP is exactly level 2
+    assert at.session_state["player_hp"] == 120  # level up heals fully
+    assert (0, 6, 3) in at.session_state["defeated"]
+
+
+def test_knocked_out_witch_wakes_at_entrance_with_full_hp():
+    at = AppTest.from_file("../app.py", default_timeout=120)
+    _battle(at, player_hp=1)
+    _cast(at, 99)
+    assert at.session_state["mode"] == "explore"
+    assert at.session_state["player_hp"] == 100
+    assert at.session_state["pos"] == MAPS[0]["entry"]
+
+
+def test_stepping_into_a_monster_in_the_app_starts_a_battle():
+    at = AppTest.from_file("../app.py", default_timeout=120)
     at.run()
+    at.session_state["pos"] = (6, 2)
+    next(b for b in at.button if b.label == "\u25bc").click().run()
+    assert at.session_state["mode"] == "battle"
+    assert at.session_state["enemy"]["name"] == "Bog Slime"
 
-    guess_inputs = [w for w in at.text_input]
-    assert guess_inputs, "Expected a guess text input to be rendered"
-    guess_inputs[0].set_value("1").run()
 
-    submit_button = next(
-        b for b in at.button if "Submit Guess" in b.label
-    )
-    submit_button.click().run()
-
-    # The underlying state updated as expected.
-    assert at.session_state["attempts"] == 1
-    assert at.session_state["history"] == [1]
-
-    # And the debug expander, rendered in this same run, already reflects it.
-    debug_expander = next(e for e in at.expander if "Debug" in e.label)
-    debug_text = " ".join(m.value for m in debug_expander.markdown)
-
-    assert "Attempts: `1`" in debug_text
-    assert debug_expander.json[0].value == "[1]"
+def test_flee_returns_to_the_map():
+    at = AppTest.from_file("../app.py", default_timeout=120)
+    _battle(at)
+    next(b for b in at.button if "Flee" in b.label).click().run()
+    assert at.session_state["mode"] == "explore"

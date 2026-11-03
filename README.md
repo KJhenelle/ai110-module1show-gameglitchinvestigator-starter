@@ -9,6 +9,26 @@ It wrote the code, ran away, and now the game is unplayable.
 - The hints lie to you.
 - The secret number seems to have commitment issues.
 
+## 🔮 Hexbound: Witch's Gambit (game mode)
+
+Run it with `python -m streamlit run app.py`. The game has two parts.
+
+**Exploring (overworld)**
+- Walk a pixel-art witch around a tile map with the arrow keys / WASD (or the on-screen ▲◀▼▶ buttons).
+- Trees and water block you, the 🏠 inn heals you, and villagers give hints.
+- Step into a monster to start a battle. Winning earns XP; level-ups raise max HP and spell damage.
+- Gates are locked until you reach the required level. Level 3 opens the Whispering Woods; a sealed level-6 door is a placeholder for a future area.
+- Monsters respawn when you re-enter an area, so you can grind.
+
+**Battling (the number guessing)**
+- Guess the hidden number (1-100) to cast a spell. **Spell power = 100 - distance from the number**, so closer guesses hit harder.
+- A spell **lands** if the guess is within 10 on your **first 2 guesses** at that number, or is **exact** on any guess (exact = critical hit).
+- If the spell doesn't land, the **enemy strikes back** and the number stays the same. When a spell lands, the **number switches**.
+- Attacks are animated: a projectile flies across, the target shakes and flashes, and damage floats up.
+- Getting knocked out isn't game over: you wake at the area entrance. You can also flee.
+
+Code map: `world.py` (maps, monsters, movement rules), `sprites.py` (pixel art), `render.py` (HTML/SVG builders), `logic_utils.py` (battle and leveling rules), `app.py` (UI and state).
+
 ## 🛠️ Setup
 
 1. Install dependencies: `pip install -r requirements.txt`
