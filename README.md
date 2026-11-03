@@ -27,7 +27,12 @@ Run it with `python -m streamlit run app.py`. The game has two parts.
 - Attacks are animated: a projectile flies across, the target shakes and flashes, and damage floats up.
 - Getting knocked out isn't game over: you wake at the area entrance. You can also flee.
 
-Code map: `world.py` (maps, monsters, movement rules), `sprites.py` (pixel art), `render.py` (HTML/SVG builders), `logic_utils.py` (battle and leveling rules), `app.py` (UI and state).
+**Gemini battle narration (optional)**
+- Set `GEMINI_API_KEY` (e.g. `export GEMINI_API_KEY=...` before running, or in `.streamlit/secrets.toml`) to get a one-line narration after every spell. `GEMINI_MODEL` overrides the default `gemini-2.5-flash`.
+- The model only sees the outcome (power, damage, HP), never the secret number, and never affects game state. With no key, or if the call fails, canned narration is used.
+- When the number switches, the arena badge flashes **NEW NUMBER #n** and a banner appears. Your guesses at the current number are listed so you can see what no longer applies.
+
+Code map: `llm.py` (Gemini narration),  `world.py` (maps, monsters, movement rules), `sprites.py` (pixel art), `render.py` (HTML/SVG builders), `logic_utils.py` (battle and leveling rules), `app.py` (UI and state).
 
 ## 🛠️ Setup
 

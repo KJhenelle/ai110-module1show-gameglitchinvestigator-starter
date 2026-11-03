@@ -121,7 +121,7 @@ svg {{ width: 100%; max-width: {w * 48}px; margin: 0 auto; border: 3px solid #8b
 
 
 def arena_html(sprite, enemy_name, enemy_hp, enemy_max, player_hp, player_max,
-               level, event, nonce):
+               level, event, nonce, number_id=1, number_changed=False):
     """The battle scene with projectile / hit / damage-number animations."""
     bolt = dmg = ""
     hit_player = hit_enemy = ""
@@ -140,6 +140,11 @@ def arena_html(sprite, enemy_name, enemy_hp, enemy_max, player_hp, player_max,
         pct = max(0, min(100, cur / mx * 100))
         return f'<div class="bar {cls}"><div style="width:{pct}%"></div></div>'
 
+    badge = (
+        f'<div class="badge new">🔄 NEW NUMBER #{number_id}</div>' if number_changed
+        else f'<div class="badge">🔮 Number #{number_id}</div>'
+    )
+
     return f"""<!doctype html><html><head><meta charset="utf-8"><!-- {nonce} --><style>
 {_BASE_CSS}
 body {{ color: #f1e7ff; background: #0f0a1f; border-radius: 12px; }}
@@ -157,6 +162,12 @@ body {{ color: #f1e7ff; background: #0f0a1f; border-radius: 12px; }}
   animation: floatUp 1.1s .55s forwards; }}
 .dmg.onenemy {{ right: 50px; color: #ffd166; text-shadow: 0 0 10px #ff9f1c; }}
 .dmg.onplayer {{ left: 50px; color: #ff5d73; text-shadow: 0 0 10px #c1121f; }}
+.badge {{ position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5;
+  padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  background: #2d2250; border: 1px solid #6d4aff; color: #cdbdff; }}
+.badge.new {{ background: #ffd166; color: #3a2400; border-color: #ff9f1c;
+  animation: pulse .6s 1.1s 4; }}
+@keyframes pulse {{ 50% {{ transform: translateX(-50%) scale(1.25); box-shadow: 0 0 16px #ffd166; }} }}
 .row {{ display: flex; gap: 16px; margin-top: 10px; }}
 .row > div {{ flex: 1; font-size: 14px; }}
 .bar {{ background: #2d2250; border-radius: 8px; height: 14px; overflow: hidden; border: 1px solid #6d4aff; margin-top: 4px; }}
@@ -172,7 +183,7 @@ body {{ color: #f1e7ff; background: #0f0a1f; border-radius: 12px; }}
 @keyframes flash {{ 50% {{ filter: brightness(3) saturate(0); }} }}
 @keyframes floatUp {{ 0% {{ opacity: 1; transform: translateY(30px); }} 100% {{ opacity: 0; transform: translateY(-20px); }} }}
 </style></head><body>
-<div class="arena">{bolt}{dmg}
+<div class="arena">{badge}{bolt}{dmg}
   <div class="fighter{hit_player}">{sprites.sprite_svg("witch", 96)}</div>
   <div class="fighter{hit_enemy}">{sprites.sprite_svg(sprite, 96)}</div>
 </div>

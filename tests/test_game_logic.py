@@ -10,6 +10,13 @@ from logic_utils import (
     max_hp_for_level,
     spell_multiplier,
 )
+import io
+import json
+import urllib.error
+
+import pytest
+
+import llm
 from world import MAPS, try_move
 
 # FIX: check_guess returns an (outcome, message) tuple; agent mode updated
@@ -185,3 +192,55 @@ def test_flee_returns_to_the_map():
     _battle(at)
     next(b for b in at.button if "Flee" in b.label).click().run()
     assert at.session_state["mode"] == "explore"
+
+
+@pytest.fixture(autouse=True)
+def no_real_api_calls(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+
+
+EVENT = {"enemy": "Bog Slime", "power": 90, "damage": 90, "landed": True,
+         "crit": False, "player_hp": 100, "enemy_hp": 60}
+
+
+def test_narrate_without_a_key_uses_the_fallback():
+    text, used_llm = llm.narrate(EVENT)
+    assert text and not used_llm
+
+
+def test_narrate_returns_gemini_text_and_never_sends_a_secret():
+    sent = {}
+
+    def fake_urlopen(req, timeout):
+        sent["body"] = json.loads(req.data)
+        sent["key"] = req.get_header("X-goog-api-key")
+        reply = {"candidates": [{"content": {"parts": [{"text": " Boom! "}]}}]}
+        return io.BytesIO(json.dumps(reply).encode())
+
+    text, used_llm = llm.narrate(EVENT, api_key="k", urlopen=fake_urlopen)
+    assert (text, used_llm) == ("Boom!", True)
+    assert sent["key"] == "k"
+    assert "secret" not in json.dumps(sent["body"]).lower()
+
+
+def test_narrate_falls_back_on_network_error_and_bad_payload():
+    def boom(req, timeout):
+        raise urllib.error.URLError("down")
+
+    def junk(req, timeout):
+        return io.BytesIO(b"{}")
+
+    assert llm.narrate(EVENT, api_key="k", urlopen=boom)[1] is False
+    assert llm.narrate(EVENT, api_key="k", urlopen=junk)[1] is False
+
+
+def test_number_change_is_signalled_when_a_spell_lands():
+    at = AppTest.from_file("../app.py", default_timeout=120)
+    _battle(at)
+    _cast(at, 99)  # miss: same number
+    assert at.session_state["number_id"] == 1
+    _cast(at, 55)  # near-miss on guess 2 lands: number switches
+    assert at.session_state["number_id"] == 2
+    assert any("number has changed" in s.value for s in at.success)
+    assert at.session_state["narration"]

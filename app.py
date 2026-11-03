@@ -3,6 +3,7 @@ import random
 import streamlit as st
 import streamlit.components.v1 as components
 
+import llm
 import render
 from logic_utils import (
     add_xp,
@@ -59,6 +60,8 @@ def new_game():
     st.session_state.last_event = None  # drives the attack animation
     st.session_state.log = []
     st.session_state.nonce = 0
+    st.session_state.number_id = 1
+    st.session_state.narration = ""
 
 
 def enter_area(area, pos):
@@ -80,6 +83,8 @@ def start_battle(code, at):
     st.session_state.history = []
     st.session_state.hint = None
     st.session_state.last_event = None
+    st.session_state.number_id = 1
+    st.session_state.narration = ""
     st.session_state.log = [f"A {mon['name']} blocks your path! Cast your spell!"]
 
 
@@ -166,13 +171,25 @@ st.caption(
     "Land within 10 on your first 2 guesses, or hit it exactly, and the spell "
     "strikes. Miss and the enemy strikes back!"
 )
+number_changed = bool(ss.last_event and ss.last_event["kind"] == "player")
 show_html(
     render.arena_html(
         enemy["art"], enemy["name"], ss.enemy_hp, enemy["hp"], ss.player_hp,
         max_hp, ss.level, ss.last_event, ss.nonce,
+        ss.number_id, number_changed,
     ),
     height=270,
 )
+
+if ss.narration:
+    st.markdown(f"*{ss.narration}*")
+if number_changed:
+    st.success(
+        f"🔄 The number has changed! It's a brand-new number (#{ss.number_id}). "
+        "Your earlier guesses no longer apply."
+    )
+if ss.history:
+    st.caption(f"Guesses at number #{ss.number_id}: {', '.join(map(str, ss.history))}")
 
 guesses_left_to_land = max(0, 2 - ss.attempts)
 st.info(
@@ -214,6 +231,7 @@ if submit:
             )
             # The number switches once a spell has landed.
             ss.secret = random.randint(LOW, HIGH)
+            ss.number_id += 1
             ss.attempts = 0
             ss.history = []
             ss.hint = None
@@ -242,6 +260,14 @@ if submit:
                 ss.pos = MAPS[ss.area]["entry"]
                 ss.mode = "explore"
                 ss.msg = "💀 You were knocked out... and wake up at the area entrance."
+        ev = ss.last_event
+        with st.spinner("The narrator inks the scene..."):
+            ss.narration, used_llm = llm.narrate({
+                "enemy": enemy["name"], "power": power, "damage": ev["damage"],
+                "landed": ev["kind"] == "player", "crit": ev["crit"],
+                "player_hp": ss.player_hp, "enemy_hp": ss.enemy_hp,
+            })
+        ss.log.append(f"📖 {ss.narration}")
         st.rerun()
 
 if show_hint and ss.hint and ss.attempts:
